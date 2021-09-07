@@ -18,44 +18,47 @@ include_once('tbszip.php');
  */
 function merge2Docx($document1, $document2, $outputfile)
 {
+    $pageBreak ='<w:p><w:pPr><w:sectPr><w:type w:val="nextPage" /></w:sectPr></w:pPr></w:p>';
+
     if (file_exists($document1) && file_exists($document2)) {
         $zip = new clsTbsZip();
 
         // Open the first document
         $zip->Open($document1);
-        $content1 = $zip->FileRead('word/document.xml');
+        $content1 = $zip->FileRead('word'.DIRECTORY_SEPARATOR.'document.xml');
         $zip->Close();
 
         // Extract the content of the first document
         $p = strpos($content1, '<w:body');
-        if ($p === false){
+        if ($p === false) {
             // Tag <w:body> not found in document 1
             return null;
         }
         $p = strpos($content1, '>', $p);
         $content1 = substr($content1, $p + 1);
         $p = strpos($content1, '</w:body>');
-        if ($p === false){
+        if ($p === false) {
             // Tag </w:body> not found in document 1
             return null;
         }
-        $content1 = '<w:p><w:r><w:br w:type="page" /><w:lastRenderedPageBreak/></w:r></w:p>'.substr($content1, 0, $p);
+
+        $content1 =  $pageBreak.substr($content1, 0, $p);
 
         // Insert into the second document
         $zip->Open($document2);
-        $content2 = $zip->FileRead('word/document.xml');
+        $content2 = $zip->FileRead('word'.DIRECTORY_SEPARATOR.'document.xml');
         $p = strpos($content2, '</w:body>');
-        if ($p === false){
+        if ($p === false) {
             // Tag </w:body> not found in document 2
             return null;
         }
         $content2 = substr_replace($content2, $content1, $p, 0);
-        $zip->FileReplace('word/document.xml', $content2, TBSZIP_STRING);
+        $zip->FileReplace('word'.DIRECTORY_SEPARATOR.'document.xml', $content2, 32);
 
         // Save the merge into a third file
         $zip->Flush(TBSZIP_FILE, $outputfile);
-        if(file_exists($outputfile)) return $outputfile;
-        else return null;
+
+        return $outputfile;
     } else {
         // $document1 or $document2 doesn't exist
         return null;
@@ -72,15 +75,23 @@ function mergeDocx($documents, $outputfile)
     $documents = array_reverse($documents);
     $nbDocx = count($documents);
 
-    $previousMerge = merge2Docx($documents[0], $documents[1], $outputfile);
-    for ($i = 2; $i < $nbDocx; $i++) {
-        if($previousMerge !== null){
-            $previousMerge = merge2Docx($previousMerge, $documents[$i], $outputfile);
+    if ($nbDocx >= 2) {
+        $previousMerge = merge2Docx($documents[0], $documents[1], $outputfile);
+        for ($i = 2; $i < $nbDocx; $i++) {
+            if ($previousMerge !== null) {
+                $previousMerge = merge2Docx($previousMerge, $documents[$i], $outputfile);
+            } else {
+                return null;
+            }
         }
-        else{
-            return null;
-        }
+        return 0;
     }
-    if($previousMerge !== null) return 0;
-    else return null;
+    elseif ($nbDocx == 1){
+        copy($documents[0], $outputfile);
+        return 0;
+    }
+    else{
+        return null;
+    }
+
 }
